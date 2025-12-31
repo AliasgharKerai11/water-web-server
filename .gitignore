@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+.out/
+.nuxt/
+.next/
+coverage/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS / Editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Cache
+.cache/
+.tmp/
+temp/
+
+# Vercel / Netlify
+.vercel/
+.netlify/
+
+# Firebase
+.firebase/
+
+# Misc
+*.pem
+*.key
