@@ -15,17 +15,12 @@ type QRData =
 
 // ---------------- EXPRESS ----------------
 const app = express();
-app.use(
-    cors({
-        origin: [
-            "http://localhost:3000",
-            "https://zainy-water.vercel.app/",
-        ],
-        methods: ["GET", "POST", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: true,
-    })
-);
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(express.json());
 
 // ---------------- HTTP SERVER ----------------
