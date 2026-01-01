@@ -4,7 +4,7 @@ import P from "pino";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import http from "http";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 
 // ---------------- TYPES ----------------
@@ -32,17 +32,17 @@ let lastStatus: "connected" | "disconnected" = "disconnected";
 let lastInfo: string | null = null;
 
 const broadcast = (message: QRData) => {
-    wss.clients.forEach((client: any) => {
-        if (client.readyState === client.OPEN) {
+    wss.clients.forEach((client: WebSocket) => {
+        if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(message));
         }
     });
 };
 
-wss.on("connection", (client) => {
+
+wss.on("connection", (client: WebSocket) => {
     console.log("🧲 WebSocket client connected");
 
-    // 🔥 SEND LAST KNOWN STATE IMMEDIATELY
     client.send(JSON.stringify({ type: "status", data: lastStatus }));
     client.send(JSON.stringify({ type: "info", data: lastInfo }));
 
@@ -50,6 +50,7 @@ wss.on("connection", (client) => {
         client.send(JSON.stringify({ type: "qr", data: lastQR }));
     }
 });
+
 
 // ---------------- API ----------------
 app.post("/send", async (req: Request, res: Response) => {
@@ -91,17 +92,15 @@ const startWhatsapp = async () => {
 
     sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
         if (qr) {
-            lastQR = await QRCode.toDataURL(qr);
-            if (qr) {
-                const qrDataUrl = await QRCode.toDataURL(qr);
+            const qrDataUrl = await QRCode.toDataURL(qr);
 
-                if (qrDataUrl) {
-                    broadcast({ type: "qr", data: qrDataUrl });
-                    console.log("📱 QR sent");
-                }
+            if (qrDataUrl) {
+                lastQR = qrDataUrl;
+                broadcast({ type: "qr", data: qrDataUrl });
+                console.log("📱 QR sent");
             }
-            console.log("📱 QR sent");
         }
+
 
         if (connection === "open") {
             lastQR = null;
