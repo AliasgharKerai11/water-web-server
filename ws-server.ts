@@ -15,12 +15,14 @@ type QRData =
 
 // ---------------- EXPRESS ----------------
 const app = express();
-app.use(cors({
-  origin: [ "http://localhost:3000", "http://localhost:3000/moderator"], // replace with your frontend
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  credentials: true,
-}));
-
+app.use(
+    cors({
+        origin: true, // Reflects the request origin (safer than "*")
+        credentials: true, // If you ever need cookies/auth
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+    })
+);
 
 
 app.use(express.json());
