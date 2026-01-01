@@ -15,8 +15,13 @@ type QRData =
 
 // ---------------- EXPRESS ----------------
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [ "http://localhost:3000"], // replace with your frontend
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+}));
 
+app.options("*", cors()); // <-- add this here, before routes
 
 
 app.use(express.json());
