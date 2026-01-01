@@ -9,9 +9,9 @@ import { fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 
 // ---------------- TYPES ----------------
 type QRData =
-  | { type: "qr"; data: string }
-  | { type: "status"; data: string }
-  | { type: "info"; data: string | null };
+    | { type: "qr"; data: string }
+    | { type: "status"; data: string }
+    | { type: "info"; data: string | null };
 
 // ---------------- EXPRESS ----------------
 const app = express();
@@ -22,111 +22,125 @@ app.use(express.json());
 const server = http.createServer(app);
 
 // ---------------- WEBSOCKET ----------------
-export const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server });
 
-export let sock: ReturnType<typeof makeWASocket> | null = null;
+let sock: ReturnType<typeof makeWASocket> | null = null;
+
+// 🔥 STORE LAST STATES (THIS FIXES RAILWAY)
+let lastQR: string | null = null;
+let lastStatus: "connected" | "disconnected" = "disconnected";
+let lastInfo: string | null = null;
 
 const broadcast = (message: QRData) => {
-  wss.clients.forEach((client: any) => {
-    if (client.readyState === client.OPEN) {
-      client.send(JSON.stringify(message));
-    }
-  });
+    wss.clients.forEach((client: any) => {
+        if (client.readyState === client.OPEN) {
+            client.send(JSON.stringify(message));
+        }
+    });
 };
 
 wss.on("connection", (client) => {
-  console.log("🧲 WebSocket client connected");
+    console.log("🧲 WebSocket client connected");
 
-  if (sock?.ws?.isOpen) {
-    const me = sock.authState.creds.me;
-    const accountInfo = me
-      ? `${me.name || "Unknown"} (+${me.id.split(":")[0]})`
-      : null;
+    // 🔥 SEND LAST KNOWN STATE IMMEDIATELY
+    client.send(JSON.stringify({ type: "status", data: lastStatus }));
+    client.send(JSON.stringify({ type: "info", data: lastInfo }));
 
-    client.send(JSON.stringify({ type: "status", data: "connected" }));
-    if (accountInfo) {
-      client.send(JSON.stringify({ type: "info", data: accountInfo }));
+    if (lastQR) {
+        client.send(JSON.stringify({ type: "qr", data: lastQR }));
     }
-  }
 });
 
 // ---------------- API ----------------
 app.post("/send", async (req: Request, res: Response) => {
-  const { phone, message } = req.body;
+    const { phone, message } = req.body;
 
-  if (!sock || !sock.ws?.isOpen) {
-    return res.status(400).json({
-      success: false,
-      error: "WhatsApp not connected",
-    });
-  }
+    if (!sock || !sock.ws?.isOpen) {
+        return res.status(400).json({
+            success: false,
+            error: "WhatsApp not connected",
+        });
+    }
 
-  try {
-    const formattedPhone = phone.replace(/\D/g, "");
-    await sock.sendMessage(`${formattedPhone}@s.whatsapp.net`, {
-      text: message,
-    });
+    try {
+        const formattedPhone = phone.replace(/\D/g, "");
+        await sock.sendMessage(`${formattedPhone}@s.whatsapp.net`, {
+            text: message,
+        });
 
-    res.json({ success: true });
-  } catch (err) {
-    console.error("❌ Failed to send message:", err);
-    res.status(500).json({ success: false });
-  }
+        res.json({ success: true });
+    } catch (err) {
+        console.error("❌ Failed to send message:", err);
+        res.status(500).json({ success: false });
+    }
 });
 
 // ---------------- WHATSAPP ----------------
 const startWhatsapp = async () => {
-  const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
-  const { version } = await fetchLatestBaileysVersion();
+    const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
+    const { version } = await fetchLatestBaileysVersion();
 
-  sock = makeWASocket({
-    auth: state,
-    logger: P({ level: "silent" }),
-    version,
-    browser: ["Chrome (Linux)", "", ""],
-  });
+    sock = makeWASocket({
+        auth: state,
+        logger: P({ level: "silent" }),
+        version,
+        browser: ["Chrome (Linux)", "", ""],
+    });
 
-  sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
-    if (qr) {
-      const qrDataUrl = await QRCode.toDataURL(qr);
-      broadcast({ type: "qr", data: qrDataUrl });
-      console.log("📱 QR sent");
-    }
+    sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
+        if (qr) {
+            lastQR = await QRCode.toDataURL(qr);
+            if (qr) {
+                const qrDataUrl = await QRCode.toDataURL(qr);
 
-    if (connection === "open") {
-      const me = sock?.authState.creds.me;
-      const accountInfo = me
-        ? `${me.name || "Unknown"} (+${me.id.split(":")[0]})`
-        : "Unknown";
+                if (qrDataUrl) {
+                    broadcast({ type: "qr", data: qrDataUrl });
+                    console.log("📱 QR sent");
+                }
+            }
+            console.log("📱 QR sent");
+        }
 
-      broadcast({ type: "status", data: "connected" });
-      broadcast({ type: "info", data: accountInfo });
+        if (connection === "open") {
+            lastQR = null;
+            lastStatus = "connected";
 
-      console.log("✅ WhatsApp connected:", accountInfo);
-    }
+            const me = sock?.authState.creds.me;
+            lastInfo = me
+                ? `${me.name || "Unknown"} (+${me.id.split(":")[0]})`
+                : "Unknown";
 
-    if (connection === "close") {
-      broadcast({ type: "status", data: "disconnected" });
-      broadcast({ type: "info", data: null });
+            broadcast({ type: "status", data: lastStatus });
+            broadcast({ type: "info", data: lastInfo });
 
-      const shouldReconnect =
-        (lastDisconnect?.error as any)?.output?.statusCode !== 401;
+            console.log("✅ WhatsApp connected:", lastInfo);
+        }
 
-      console.log("❌ WhatsApp disconnected");
+        if (connection === "close") {
+            lastStatus = "disconnected";
+            lastInfo = null;
 
-      if (shouldReconnect) {
-        setTimeout(startWhatsapp, 5000);
-      }
-    }
-  });
+            broadcast({ type: "status", data: lastStatus });
+            broadcast({ type: "info", data: null });
+
+            const shouldReconnect =
+                (lastDisconnect?.error as any)?.output?.statusCode !== 401;
+
+            console.log("❌ WhatsApp disconnected");
+
+            if (shouldReconnect) {
+                setTimeout(startWhatsapp, 5000);
+            }
+        }
+    });
 };
 
 // ---------------- START SERVER ----------------
 const PORT = process.env.PORT || 3001;
 
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  startWhatsapp();
+    console.log(`🚀 Server running on port ${PORT}`);
+    startWhatsapp();
 });
