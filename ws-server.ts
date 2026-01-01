@@ -15,6 +15,15 @@ type QRData =
 
 // ---------------- EXPRESS ----------------
 const app = express();
+app.get("/health", (req, res) => {
+    const status = sock?.ws?.isOpen ? "connected" : "disconnected";
+    res.status(200).json({
+        status: "healthy",
+        whatsapp: status,
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+    });
+});
 app.use(
     cors({
         origin: true, // Reflects the request origin (safer than "*")
@@ -146,9 +155,9 @@ const startWhatsapp = async () => {
 };
 
 // ---------------- START SERVER ----------------
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT || 3001);  // Explicitly convert to number
 
-server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running on port ${PORT} (bound to 0.0.0.0)`);
     startWhatsapp();
 });
