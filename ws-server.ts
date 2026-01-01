@@ -101,7 +101,7 @@ const startWhatsapp = async () => {
 
     sock = makeWASocket({
         auth: state,
-        logger: P({ level: "silent" }),
+        logger: P({ level: "debug" }),
         version,
         browser: ["Chrome (Linux)", "", ""],
     });
