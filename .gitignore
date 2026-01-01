@@ -43,6 +43,10 @@ temp/
 # Firebase
 .firebase/
 
+
+auth_info_baileys*
+
+
 # Misc
 *.pem
 *.key
